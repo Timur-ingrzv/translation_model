@@ -1,1 +1,1 @@
-from .model_class import EncoderRNN, DecoderRNN
+from .model_class import TranslationModel

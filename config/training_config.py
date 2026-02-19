@@ -27,7 +27,7 @@ class TrainConfig:
     
     def get_scheduler(self, optimizer):
         if self.scheduler_name == 'CosineScheduler':
-            return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.num_epochs)
+            return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.num_epochs, eta_min=1e-5)
         elif self.scheduler_name == 'Cosine scheduler with warmup':
             scheduler1 = torch.optim.lr_scheduler.LinearLR(
                 optimizer, start_factor=0.1, total_iters=5

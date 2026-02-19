@@ -11,7 +11,7 @@ import random
 import torch
 from torch.utils.data import DataLoader
 
-from models import EncoderRNN, DecoderRNN
+from models import TranslationModel
 
 from config import DataConfig
 from config import ModelConfig
@@ -20,6 +20,8 @@ from config import TrainConfig
 from loops import train_epoch
 from loops import eval_epoch
 from loops import evaluate_bleu
+
+from utils import convert_to_text
 
 # for experiments representation
 def set_random_seed(seed):
@@ -63,28 +65,20 @@ val_dataset = data_config.get_val_dataset(de_vocab, en_vocab)
 train_loader = DataLoader(train_dataset, batch_size=training_config.batch_size, shuffle=True, num_workers=training_config.n_workers, pin_memory=True)
 val_loader = DataLoader(val_dataset, batch_size=training_config.batch_size, shuffle=False, num_workers=training_config.n_workers, pin_memory=True)
 
-encoder = EncoderRNN(
-    data_config.vocab_size,
-    model_config.embed_dim,
-    model_config.hidden_dim,
-    model_config.dropout_rate
-).to(device)
-
-decoder = DecoderRNN(
-    data_config.vocab_size,
-    model_config.embed_dim,
-    model_config.hidden_dim,
-    en_vocab,
+model = TranslationModel(
+    de_vocab.vocab_size(),
+    en_vocab.vocab_size(),
+    model_config.d_model,
+    model_config.dropout_rate,
+    model_config.num_encoder_layers,
+    model_config.num_decoder_layers,
     data_config.max_length
 ).to(device)
-
 loss_fn = training_config.loss_fn
 
-optimizer_encoder = training_config.get_optimizer(encoder)
-optimizer_decoder = training_config.get_optimizer(decoder)
+optimizer = training_config.get_optimizer(model)
 
-scheduler_encoder = training_config.get_scheduler(optimizer_encoder)
-scheduler_decoder = training_config.get_scheduler(optimizer_decoder)
+scheduler = training_config.get_scheduler(optimizer)
 
 # init comet
 if args.log_experiment:
@@ -103,10 +97,8 @@ if args.log_experiment:
             project_name="bhw-2",
             experiment_config=experiment_config   
         )
-    experiment.log_parameter('optimizer_encoder', optimizer_encoder.__class__.__name__)
-    experiment.log_parameter('optimizer_decoder', optimizer_decoder.__class__.__name__)
-    experiment.log_parameter('scheduler', scheduler_encoder.__class__.__name__)
-    experiment.log_parameter('scheduler', scheduler_decoder.__class__.__name__)
+    experiment.log_parameter('optimizer', optimizer.__class__.__name__)
+    experiment.log_parameter('scheduler', scheduler.__class__.__name__)
     experiment.log_parameter('batch_size', TrainConfig.batch_size)
 
 # training process
@@ -121,10 +113,9 @@ if args.continue_training:
     checkpoint = torch.load(f"checkpoints/{experiment_name}.pth")
     best_val_acc = checkpoint['best_val_acc']
     cur_epoch = checkpoint['epoch'] + 1
-    encoder.load_state_dict(checkpoint['encoder_state_dict'])
-    decoder.load_state_dict(checkpoint['decoder_state_dict'])
-    optimizer_encoder.load_state_dict(checkpoint['optimizer_encoder_state_dict'])
-    optimizer_decoder.load_state_dict(checkpoint['optimizer_decoder_state_dict'])
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_decoder_state_dict'])
     scheduler_encoder.load_state_dict(checkpoint['scheduler_encoder_state_dict'])
     scheduler_decoder.load_state_dict(checkpoint['scheduler_decoder_state_dict'])
 

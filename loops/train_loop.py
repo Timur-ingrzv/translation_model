@@ -4,36 +4,34 @@ import numpy as np
 import torch 
 
 def train_epoch(
-        encoder,
-        decoder,
-        optimizer_encoder,
-        optimizer_decoder,
+        model, 
+        optimizer,
         train_loader, 
         loss_fn, 
-        device
+        device,
+        grad_clip=1
     ):
-    encoder.train()
-    decoder.train()
+    model.train()
     train_loss = 0.0
+    total_tokens = 0
     bar = tqdm(train_loader, 'Train epoch') if TrainConfig.verbose else train_loader
     for de_indices, en_indices, de_length, en_length in bar:
-        optimizer_encoder.zero_grad()
-        optimizer_decoder.zero_grad()
-
+        optimizer.zero_grad()
         de_indices = de_indices[:, :de_length.max()].to(device)
-        encoder_outputs, encoder_hidden = encoder(de_indices, de_length)
+        en_indices = de_indices[:, :en_length.max()].to(device)
 
-        en_indices = en_indices[:, :en_length.max()].to(device)
-        logits = decoder(en_indices[:, :-1], en_length - 1, encoder_hidden)
-        loss = loss_fn(logits.transpose(1, 2), en_indices[:, 1:])
-
-        train_loss += loss.item() * en_indices.shape[0]
-        
+        logits = model(de_indices, en_indices[:, :-1])
+        loss = loss_fn(logits.reshape(-1, logits.shape[-1]), en_indices[:, 1:].reshape(-1))
         loss.backward()
-        optimizer_encoder.step()
-        optimizer_decoder.step()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip)
+        optimizer.step()
 
-    train_loss /= len(train_loader.dataset)
+        with torch.no_grad():
+            non_pad_tokens = (en_indices[:, 1:] == model.pad_id).sum().item()
+            train_loss += loss.item() * non_pad_tokens
+            total_tokens += non_pad_tokens
+
+    train_loss /= total_tokens
     return train_loss
 
         

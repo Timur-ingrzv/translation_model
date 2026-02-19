@@ -12,7 +12,7 @@ class DataConfig:
     root = 'data'
     val_size = 0.2
     min_frequency = 2
-    max_length = 60
+    max_length = 100
     vocab_size = 50_000
 
     with open(os.path.join(root, 'train.de-en.de')) as f:
