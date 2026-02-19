@@ -115,36 +115,32 @@ if args.continue_training:
     cur_epoch = checkpoint['epoch'] + 1
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_decoder_state_dict'])
-    scheduler_encoder.load_state_dict(checkpoint['scheduler_encoder_state_dict'])
-    scheduler_decoder.load_state_dict(checkpoint['scheduler_decoder_state_dict'])
+    scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
 print(f'Starting experiment {experiment_name}')
 print(f'device: ', model_config.device)
-print(f'encoder_params: ', sum(param.numel() for param in encoder.parameters()))
-print(f'decoder_params: ', sum(param.numel() for param in decoder.parameters()))
+print(f'encoder_params: ', sum(param.numel() for param in model.parameters()))
 print(f'log experiment: ', 'Yes' if args.log_experiment else 'No')
 
 for epoch in range(cur_epoch, cur_epoch + num_epochs):
     print(f"\nEpoch {epoch}/{cur_epoch + num_epochs - 1}")
     print("-" * 60)
-    lr = optimizer_encoder.param_groups[0]['lr']
+    lr = optimizer.param_groups[0]['lr']
 
     # train
     train_loss = train_epoch(
-        encoder, decoder,
-        optimizer_encoder, optimizer_decoder,
+        model,
+        optimizer,
         train_loader, loss_fn, device
     )
 
     # validation
-    val_loss = eval_epoch(encoder, decoder, loss_fn, val_loader, device)
+    val_loss = eval_epoch(model, loss_fn, val_loader, device)
 
-    scheduler_encoder.step()
-    scheduler_decoder.step()
+    scheduler
 
     if epoch % 1 == 0:
-        val_bleu = evaluate_bleu(encoder, decoder, val_loader, device)
+        val_bleu = evaluate_bleu(model, val_loader, device)
         if args.log_experiment:
             experiment.log_metrics({'val_bleu': val_bleu}, epoch=epoch)
     
@@ -163,13 +159,10 @@ for epoch in range(cur_epoch, cur_epoch + num_epochs):
         checkpoint = {
             'epoch': epoch,
             'best_val_acc': best_val_bleu,
-            'encoder_state_dict': encoder.state_dict(),
-            'decoder_state_dict': decoder.state_dict(),
-            'optimizer_encoder_state_dict': optimizer_encoder.state_dict(),
-            'optimizer_decoder_state_dict': optimizer_decoder.state_dict(),
-            'optimizer_class': optimizer_encoder.__class__.__name__,
-            'scheduler_state_dict': scheduler_encoder.state_dict(),
-            'scheduler_class': scheduler_encoder.__class__.__name__
+            'encoder_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'optimizer_class': optimizer.__class__.__name__,
+            'scheduler_state_dict': scheduler.state_dict()
         }
         if training_config.verbose:
             print(f"--> New best model saved (Val BLEU: {best_val_bleu:.2f}%)")
@@ -185,7 +178,7 @@ for epoch in range(cur_epoch, cur_epoch + num_epochs):
 
 # load best model
 checkpoint = torch.load(f"checkpoints/{experiment_name}.pth")
-decoder.load_state_dict(checkpoint['decoder_state_dict'])
+model.load_state_dict(checkpoint['model_state_dict'])
 
 
 # predict on test
@@ -193,17 +186,15 @@ print('Starting prediction on test set')
 test_dataset = data_config.get_test_dataset(de_vocab, en_vocab)
 test_loader = DataLoader(test_dataset, shuffle=False, batch_size=training_config.batch_size,num_workers=training_config.n_workers)
 predictions = []
-for de_indices, en_indices, de_length, en_length in tqdm(val_loader, desc='Prediction on test'):
-    de_indices = de_indices[:, :de_length.max()].to(device)
-
-    encoder_outputs, encoder_hidden = encoder(de_indices, de_length)
-    tokens_ids = decoder.inference(encoder_hidden).cpu().tolist()
-    predictions.extend(decoder.en_vocab.decode(tokens_ids))
+for de_indices, de_lengths in tqdm(test_loader, desc='Predicting on test'):
+    de_indices = de_indices[:, :de_lengths.max()].to(device)
+    predicted_tokens = model.inference(de_indices).cpu().tolist()
+    predictions.extend([convert_to_text(seq, en_vocab) for seq in predicted_tokens])
 
 predictions = [s + '\n' for s in predictions]
 
-# Записываем в файл
-with open('output.txt', 'w', encoding='utf-8') as file:
+# write predictions to file
+with open('test1.de-en.en', 'w', encoding='utf-8') as file:
     file.writelines(predictions)
 
 if args.log_experiment: 
