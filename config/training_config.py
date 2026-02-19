@@ -5,7 +5,7 @@ import torch.nn as nn
 @dataclass
 class TrainConfig:
     num_epochs: int = 15
-    batch_size: int = 256
+    batch_size: int = 128
 
     n_workers: int = 4
     early_stopping_rounds: int = 50
@@ -13,7 +13,7 @@ class TrainConfig:
     optimizer_name: str = 'AdamW'
     learning_rate: int = 1e-2
     weight_decay = 0.0001
-    scheduler_name: str = 'CosineScheduler'
+    scheduler_name: str = 'Cosine scheduler with warmup'
     
     loss_fn = nn.CrossEntropyLoss(ignore_index=0) # PAD_ID
 
@@ -33,7 +33,7 @@ class TrainConfig:
                 optimizer, start_factor=0.1, total_iters=5
             )
             scheduler2 = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, T_max=295, eta_min=1e-5
+                optimizer, T_max=20, eta_min=1e-5
             )
             return torch.optim.lr_scheduler.SequentialLR(optimizer, [scheduler1, scheduler2], milestones=[5])
     

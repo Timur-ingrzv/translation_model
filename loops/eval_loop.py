@@ -12,11 +12,11 @@ def eval_epoch(model, loss_fn, val_loader, device):
         de_indices = de_indices[:, :de_length.max()].to(device)
         en_indices = en_indices[:, :en_length.max()].to(device)
 
-        logits = model(de_indices, en_indices[:, -1:])
+        logits = model(de_indices, en_indices[:, :-1])
         loss = loss_fn(logits.reshape(-1, logits.shape[-1]), en_indices[:, 1:].reshape(-1))
         non_pad_tokens = (en_indices[:, 1:] != model.pad_id).sum()
         val_loss += loss.item() * non_pad_tokens
         total_tokens += non_pad_tokens
 
-    val /= total_tokens
-    return val
+    val_loss /= total_tokens
+    return val_loss

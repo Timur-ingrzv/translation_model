@@ -6,7 +6,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 # https://github.com/pytorch/examples/blob/main/word_language_model/model.py
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=5000):
+    def __init__(self, d_model, dropout=0.1, max_len=200):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -19,7 +19,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
+        x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)
     
 class TranslationModel(nn.Module):
@@ -31,8 +31,10 @@ class TranslationModel(nn.Module):
             dropout_rate, 
             num_encoder_layers,
             num_decoder_layers,
-            max_length
+            max_length,
+            dim_feedforward
         ):
+        super().__init__()
         self.pad_id=0
         self.unk_id=1
         self.bos_id=2
@@ -47,7 +49,8 @@ class TranslationModel(nn.Module):
             batch_first=True,
             num_encoder_layers=num_encoder_layers,
             num_decoder_layers=num_decoder_layers,
-            activation='gelu'
+            activation='gelu',
+            dim_feedforward=dim_feedforward
         )
         self.max_length = max_length
         self.projection = nn.Linear(d_model, tgt_vocab_size, bias=False)
@@ -71,10 +74,10 @@ class TranslationModel(nn.Module):
         src_key_padding_mask = (src_tokens == self.pad_id)
         tgt_key_padding_mask = (tgt_tokens_in == self.pad_id)
         src_embeds = self.src_embedding(src_tokens) * math.sqrt(self.d_model)
-        tgt_embeds = self.tgt_embedding(tgt_embeds) * math.sqrt(self.d_model)
+        tgt_embeds = self.tgt_embedding(tgt_tokens_in) * math.sqrt(self.d_model)
         src_embeds = self.pos_enc(src_embeds)
         tgt_embeds = self.pos_enc(tgt_embeds)
-        tgt_mask = self.generate_square_subsequent_mask(len(tgt_tokens_in), device)
+        tgt_mask = self.generate_square_subsequent_mask(tgt_tokens_in.shape[1], device)
         outputs = self.transformer(
             src_embeds, tgt_embeds,
             tgt_mask=tgt_mask,
@@ -96,7 +99,7 @@ class TranslationModel(nn.Module):
         device = src_tokens.device
         B = src_tokens.shape[0]
         tokens = torch.full((B, 1), self.bos_id).to(device)
-        is_finished = torch.zeros(B, dtype=torch.bool)
+        is_finished = torch.zeros(B, dtype=torch.bool).to(device)
         for step in range(self.max_length):
             # logits (B, tokens_len, V)
             logits = self.forward(src_tokens, tokens)

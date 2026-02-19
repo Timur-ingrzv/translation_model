@@ -33,6 +33,10 @@ class Vocab:
                 remove_extra_whitespaces=False,
                 treat_whitespace_as_suffix=False
             )
+        self.pad_id=0
+        self.unk_id=1
+        self.bos_id=2
+        self.eos_id=3
         self.vocab = SentencePieceProcessor(model_file=f'tokenizer_{prefix}' + '.model')
 
     def encode(self, texts: Union[str, List[str]]) -> Union[List[int], List[List[int]]]:

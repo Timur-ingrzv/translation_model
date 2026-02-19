@@ -37,7 +37,7 @@ set_random_seed(0xDEADF00D)
 # parser
 parser = argparse.ArgumentParser()
 parser.add_argument("-exp", "--experiment_name", type=str, default="test")
-parser.add_argument("--n_epochs", type=int, default=10)
+parser.add_argument("--n_epochs", type=int, default=15)
 parser.add_argument("--continue_training", action="store_true")
 parser.add_argument("--log_experiment", action='store_true')
 parser.add_argument("--no_display", action='store_false')
@@ -66,13 +66,14 @@ train_loader = DataLoader(train_dataset, batch_size=training_config.batch_size, 
 val_loader = DataLoader(val_dataset, batch_size=training_config.batch_size, shuffle=False, num_workers=training_config.n_workers, pin_memory=True)
 
 model = TranslationModel(
-    de_vocab.vocab_size(),
-    en_vocab.vocab_size(),
+    de_vocab.vocab.vocab_size(),
+    en_vocab.vocab.vocab_size(),
     model_config.d_model,
     model_config.dropout_rate,
     model_config.num_encoder_layers,
     model_config.num_decoder_layers,
-    data_config.max_length
+    data_config.max_length,
+    model_config.dim_feedforward
 ).to(device)
 loss_fn = training_config.loss_fn
 
@@ -103,7 +104,7 @@ if args.log_experiment:
 
 # training process
 num_epochs = TrainConfig.num_epochs
-best_val_bleu = 0.0
+best_val_bleu = -1
 val_bleus = []
 val_bleu = -1
 cur_epoch = 1
@@ -159,7 +160,7 @@ for epoch in range(cur_epoch, cur_epoch + num_epochs):
         checkpoint = {
             'epoch': epoch,
             'best_val_acc': best_val_bleu,
-            'encoder_dict': model.state_dict(),
+            'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'optimizer_class': optimizer.__class__.__name__,
             'scheduler_state_dict': scheduler.state_dict()
