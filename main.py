@@ -118,7 +118,7 @@ if args.continue_training:
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
-print(f'Starting experiment {experiment_name}')
+print(f'Starting experiment: {experiment_name}')
 print(f'device: ', model_config.device)
 print(f'encoder_params: ', sum(param.numel() for param in model.parameters()))
 print(f'log experiment: ', 'Yes' if args.log_experiment else 'No')
@@ -138,7 +138,7 @@ for epoch in range(cur_epoch, cur_epoch + num_epochs):
     # validation
     val_loss = eval_epoch(model, loss_fn, val_loader, device)
 
-    scheduler
+    scheduler.step()
 
     if epoch % 1 == 0:
         val_bleu = evaluate_bleu(model, val_loader, device)

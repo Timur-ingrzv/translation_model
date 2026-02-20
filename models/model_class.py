@@ -104,9 +104,9 @@ class TranslationModel(nn.Module):
             # logits (B, tokens_len, V)
             logits = self.forward(src_tokens, tokens)
             #next_token: (B,)
-            next_token = torch.argmax(logits[:, -1, :], dim=-1).unsqueeze(1)
+            next_token = torch.argmax(logits[:, -1:, :], dim=-1)
             tokens = torch.concatenate([tokens, next_token], dim=-1)
-            is_finished = (is_finished | (next_token == self.eos_id))
+            is_finished = (is_finished | (next_token.ravel() == self.eos_id))
             if is_finished.all().item():
                 break
 

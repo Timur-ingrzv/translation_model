@@ -18,7 +18,7 @@ def train_epoch(
     for de_indices, en_indices, de_length, en_length in bar:
         optimizer.zero_grad()
         de_indices = de_indices[:, :de_length.max()].to(device)
-        en_indices = de_indices[:, :en_length.max()].to(device)
+        en_indices = en_indices[:, :en_length.max()].to(device)
 
         logits = model(de_indices, en_indices[:, :-1])
         loss = loss_fn(logits.reshape(-1, logits.shape[-1]), en_indices[:, 1:].reshape(-1))
@@ -27,7 +27,8 @@ def train_epoch(
         optimizer.step()
 
         with torch.no_grad():
-            non_pad_tokens = (en_indices[:, 1:] == model.pad_id).sum().item()
+            non_pad_tokens = (en_indices[:, 1:] != model.pad_id).sum().item()
+            non_pad_tokens = max(1, non_pad_tokens)
             train_loss += loss.item() * non_pad_tokens
             total_tokens += non_pad_tokens
 

@@ -11,8 +11,8 @@ class TrainConfig:
     early_stopping_rounds: int = 50
 
     optimizer_name: str = 'AdamW'
-    learning_rate: int = 1e-2
-    weight_decay = 0.0001
+    learning_rate: int = 5e-4
+    weight_decay = 0.001
     scheduler_name: str = 'Cosine scheduler with warmup'
     
     loss_fn = nn.CrossEntropyLoss(ignore_index=0) # PAD_ID
