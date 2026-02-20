@@ -18,9 +18,8 @@ def evaluate_bleu(model, val_loader, device):
 
         predicted_tokens = model.inference(de_indices).detach().cpu().tolist()
         all_predictions.extend([convert_to_text(seq, en_vocab) for seq in predicted_tokens])
-        labels = [convert_to_text(seq, en_vocab) for seq in en_indices.detach().cpu().tolist()]
-        all_labels.extend([label.strip() for label in labels])
 
+    all_labels = val_loader.dataset.en_texts
     bleu = sacrebleu.corpus_bleu(all_predictions, [all_labels], tokenize="none")
 
     return bleu.score
