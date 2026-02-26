@@ -2,7 +2,7 @@ from torch import nn
 import torch
 import math
 from torch.functional import F
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import torch.utils.data as tud
 
 # https://github.com/pytorch/examples/blob/main/word_language_model/model.py
 class PositionalEncoding(nn.Module):
@@ -25,14 +25,14 @@ class PositionalEncoding(nn.Module):
 class TranslationModel(nn.Module):
     def __init__(
             self,
-            src_vocab_size,
-            tgt_vocab_size, 
-            d_model, 
-            dropout_rate, 
-            num_encoder_layers,
-            num_decoder_layers,
-            max_length,
-            dim_feedforward
+            src_vocab_size=1000,
+            tgt_vocab_size=1000, 
+            d_model=128, 
+            dropout_rate=0.1, 
+            num_encoder_layers=2,
+            num_decoder_layers=2,
+            max_length=100,
+            dim_feedforward=256
         ):
         super().__init__()
         self.pad_id=0
@@ -93,21 +93,51 @@ class TranslationModel(nn.Module):
     def inference(
         self,
         src_tokens: torch.Tensor,
+        beam_width=5
     ) -> torch.Tensor:
         # src_tokens: (B, S)
         self.eval()
         device = src_tokens.device
         B = src_tokens.shape[0]
-        tokens = torch.full((B, 1), self.bos_id).to(device)
-        is_finished = torch.zeros(B, dtype=torch.bool).to(device)
-        for step in range(self.max_length):
-            # logits (B, tokens_len, V)
-            logits = self.forward(src_tokens, tokens)
-            #next_token: (B,)
-            next_token = torch.argmax(logits[:, -1:, :], dim=-1)
-            tokens = torch.concatenate([tokens, next_token], dim=-1)
-            is_finished = (is_finished | (next_token.ravel() == self.eos_id))
-            if is_finished.all().item():
-                break
+        output_tokens = torch.full((B, 1), fill_value=self.bos_id).to(device)
+        logits = self.forward(src_tokens, output_tokens)
+        next_probs = logits[:, -1, :]
+        vocab_size = next_probs.shape[-1]
+        # probs: (B, beam_width)
+        probs, next_tokens = next_probs.squeeze().log_softmax(-1)\
+        .topk(k = beam_width, axis = -1)
+        output_tokens = output_tokens.repeat((beam_width, 1))
+        next_tokens = next_tokens.reshape(-1, 1)
+        output_tokens = torch.cat([output_tokens, next_tokens], dim=-1)
 
-        return tokens
+        for _ in range(self.max_length-1):
+            dataset = tud.TensorDataset(src_tokens.repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1), output_tokens)
+            loader = tud.DataLoader(dataset, batch_size = 64)
+            next_probs = []
+            for src, tgt in loader:
+                next_probs.append(self.forward(src, tgt)[:, -1, :].log_softmax(-1))
+            # next_probs: (B * beam_width, V)
+            next_probs = torch.cat(next_probs, dim=0)
+            # next_probs: (B, beam_width, V)
+            next_probs = next_probs.reshape((-1, beam_width, next_probs.shape[-1]))
+            probs = probs.unsqueeze(-1) + next_probs
+            probs = probs.flatten(start_dim=1)
+            # probs имеет формат beam1 -> [vocab_size], beam2 -> [vocab_size] ...
+            probs, next_t = probs.topk(k=beam_width, axis=-1)
+            next_tokens = torch.remainder(next_t, vocab_size).flatten().unsqueeze(-1)
+            best_candidates = (next_t / vocab_size).long()
+            best_candidates += torch.arange(output_tokens.shape[0] // beam_width, device = device).unsqueeze(-1) * beam_width
+            output_tokens = output_tokens[best_candidates].flatten(end_dim = -2)
+            output_tokens= torch.cat((output_tokens, next_tokens), dim = -1)
+           
+    
+        # best_beam_indices (B,)
+        best_beam_idx= probs.argmax(dim=-1) 
+        offsets = torch.arange(output_tokens.shape[0] // beam_width, device=device) * beam_width
+        global_idx = offsets + best_beam_idx
+        best_sequences = output_tokens[global_idx]
+        return best_sequences   
+        
+      
+
+        
