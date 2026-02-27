@@ -120,7 +120,7 @@ if args.continue_training:
 
 print(f'Starting experiment: {experiment_name}')
 print(f'device: ', model_config.device)
-print(f'encoder_params: ', sum(param.numel() for param in model.parameters()))
+print(f'model params: ', sum(param.numel() for param in model.parameters()))
 print(f'log experiment: ', 'Yes' if args.log_experiment else 'No')
 
 for epoch in range(cur_epoch, cur_epoch + num_epochs):
@@ -140,7 +140,7 @@ for epoch in range(cur_epoch, cur_epoch + num_epochs):
 
     scheduler.step()
 
-    if epoch % 1 == 0:
+    if epoch % 4 == 1:
         val_bleu = evaluate_bleu(model, val_loader, device)
         if args.log_experiment:
             experiment.log_metrics({'val_bleu': val_bleu}, epoch=epoch)

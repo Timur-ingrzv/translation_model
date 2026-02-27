@@ -25,14 +25,14 @@ class PositionalEncoding(nn.Module):
 class TranslationModel(nn.Module):
     def __init__(
             self,
-            src_vocab_size=1000,
-            tgt_vocab_size=1000, 
-            d_model=128, 
-            dropout_rate=0.1, 
-            num_encoder_layers=2,
-            num_decoder_layers=2,
-            max_length=100,
-            dim_feedforward=256
+            src_vocab_size,
+            tgt_vocab_size, 
+            d_model, 
+            dropout_rate, 
+            num_encoder_layers,
+            num_decoder_layers,
+            max_length,
+            dim_feedforward
         ):
         super().__init__()
         self.pad_id=0

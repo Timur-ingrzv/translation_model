@@ -4,15 +4,15 @@ import torch.nn as nn
 
 @dataclass
 class TrainConfig:
-    num_epochs: int = 15
+    num_epochs: int = 21
     batch_size: int = 128
 
     n_workers: int = 4
-    early_stopping_rounds: int = 50
+    early_stopping_rounds: int = 12
 
     optimizer_name: str = 'AdamW'
     learning_rate: int = 5e-4
-    weight_decay = 0.001
+    weight_decay = 0.007
     scheduler_name: str = 'Cosine scheduler with warmup'
     
     loss_fn = nn.CrossEntropyLoss(ignore_index=0) # PAD_ID
